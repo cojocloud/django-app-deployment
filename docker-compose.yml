@@ -1,0 +1,95 @@
+version: "3.9"
+
+services:
+  web:
+    image: thiexco/django-app:latest
+    container_name: django-web
+    env_file: .env
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DJANGO_SETTINGS_MODULE=multitenantsaas.settings
+      - POSTGRES_NAME=DB2
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8585"
+    ports:
+      - "8585:8585"
+    networks:
+      - app_network
+    volumes:
+      - appdata:/app
+    depends_on:
+      - postgres
+      - redis
+
+  celery:
+    container_name: django-celery
+    build: .
+    command: celery -A multitenantsaas worker -l info
+    environment:
+      - DJANGO_SETTINGS_MODULE=multitenantsaas.settings
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - POSTGRES_HOST=postgres
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - app_network
+
+  redis:
+    image: redis:alpine
+    container_name: django-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - app_network
+
+  postgres:
+    image: postgres:15
+    container_name: django-postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=DB2
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: django-pgadmin
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "5051:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  appdata:
+    driver: local

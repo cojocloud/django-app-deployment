@@ -76,6 +76,12 @@ resource "aws_instance" "django_ec2" {
     host        = self.public_ip
     user        = "ubuntu"
     private_key = var.private_key
+    timeout     = "10m"
+    agent       = false
+  }
+
+  timeouts {
+    create = "20m"
   }
 
   tags = {

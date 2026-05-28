@@ -1,3 +1,26 @@
+resource "aws_iam_role" "ec2_ssm_role" {
+  name = "django-app-ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_policy" {
+  role       = aws_iam_role.ec2_ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "django-app-ec2-profile"
+  role = aws_iam_role.ec2_ssm_role.name
+}
+
 resource "aws_security_group" "django_sg" {
   name        = var.security_group_name
   description = "Security group for Django app EC2"
@@ -52,6 +75,7 @@ resource "aws_instance" "django_ec2" {
   key_name                    = var.key_name
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.django_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
 
   root_block_device {
     volume_size           = 30

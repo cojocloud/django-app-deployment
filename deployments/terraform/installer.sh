@@ -23,6 +23,11 @@ while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
 done
 
 sudo dpkg --configure -a 2>/dev/null || true
+
+# Remove needrestart — it spawns an interactive dialog in non-TTY sessions
+# that cannot be suppressed via environment variables alone
+sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y needrestart 2>/dev/null || true
+
 sudo apt-get update -y
 
 echo "Installing base tools..."

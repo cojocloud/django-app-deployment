@@ -145,4 +145,15 @@ curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/lat
 sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
 rm argocd-linux-amd64
 
+########################################
+# SSM Agent
+########################################
+
+echo "=== Ensuring SSM Agent is running ==="
+# Ubuntu 22.04 ships SSM agent as a snap; restart it so it picks up the IAM profile
+sudo snap restart amazon-ssm-agent 2>/dev/null || \
+  sudo systemctl restart amazon-ssm-agent 2>/dev/null || true
+sudo snap enable amazon-ssm-agent 2>/dev/null || \
+  sudo systemctl enable amazon-ssm-agent 2>/dev/null || true
+
 echo "=== All tools installed successfully ==="

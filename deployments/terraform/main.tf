@@ -104,6 +104,10 @@ resource "aws_instance" "django_ec2" {
     agent       = false
   }
 
+  lifecycle {
+    replace_triggered_by = [aws_iam_instance_profile.ec2_profile]
+  }
+
   timeouts {
     create = "20m"
   }

@@ -3,7 +3,7 @@ set -e
 
 sudo apt-get update -y
 
-log "Installing base tools..."
+echo "Installing base tools..."
 
 sudo apt-get install -y \
 curl wget git unzip zip jq \
@@ -17,7 +17,7 @@ python3 python3-pip openjdk-21-jdk
 
 if ! command -v jenkins >/dev/null 2>&1; then
 
-  log "Installing Jenkins..."
+  echo "Installing Jenkins..."
 
   if [ ! -f /usr/share/keyrings/jenkins-keyring.asc ]; then
     curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2026.key | \
@@ -42,7 +42,7 @@ sudo systemctl enable --now jenkins
 
 if ! command -v docker >/dev/null 2>&1; then
 
-  log "Installing Docker..."
+  echo "Installing Docker..."
 
   sudo install -m 0755 -d /etc/apt/keyrings
 
@@ -81,7 +81,7 @@ sudo chmod +x /usr/local/bin/docker-compose
 
 if ! command -v trivy >/dev/null 2>&1; then
 
-  log "Installing Trivy..."
+  echo "Installing Trivy..."
 
   if [ ! -f /usr/share/keyrings/trivy.gpg ]; then
     wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | \

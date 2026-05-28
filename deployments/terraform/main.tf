@@ -75,7 +75,7 @@ resource "aws_instance" "django_ec2" {
     type        = "ssh"
     host        = self.public_ip
     user        = "ubuntu"
-    private_key = file("~/.ssh/${var.key_name}.pem")
+    private_key = file("django-app-key.pem")
   }
 
   tags = {
@@ -88,3 +88,4 @@ output "ec2_public_ip" {
   value       = aws_instance.django_ec2.public_ip
   description = "Public IP of the provisioned EC2 instance"
 }
+

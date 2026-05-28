@@ -24,3 +24,9 @@ variable "security_group_name" {
   type    = string
   default = "django-app-sg"
 }
+
+variable "private_key" {
+  description = "SSH private key content for EC2 connection (store in GitHub Secrets as EC2_PRIVATE_KEY)"
+  type        = string
+  sensitive   = true
+}

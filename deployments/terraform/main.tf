@@ -75,7 +75,7 @@ resource "aws_instance" "django_ec2" {
     type        = "ssh"
     host        = self.public_ip
     user        = "ubuntu"
-    private_key = file("~/.ssh/${var.key_name}.pem")
+    private_key = var.private_key
   }
 
   tags = {

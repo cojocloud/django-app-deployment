@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Suppress all interactive apt/dpkg prompts (including needrestart "restart services?" dialog)
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
+
 # Wait for cloud-init to finish, then release apt locks held by unattended-upgrades
 echo "Waiting for cloud-init..."
 cloud-init status --wait 2>/dev/null || true
@@ -22,7 +27,7 @@ sudo apt-get update -y
 
 echo "Installing base tools..."
 
-sudo apt-get install -y \
+sudo apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
 curl wget git unzip zip jq \
 build-essential software-properties-common \
 ca-certificates gnupg lsb-release \

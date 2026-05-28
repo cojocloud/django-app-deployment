@@ -1,6 +1,23 @@
 #!/bin/bash
 set -e
 
+# Wait for cloud-init to finish, then release apt locks held by unattended-upgrades
+echo "Waiting for cloud-init..."
+cloud-init status --wait 2>/dev/null || true
+
+echo "Stopping unattended-upgrades..."
+sudo systemctl disable --now unattended-upgrades 2>/dev/null || true
+sudo killall apt apt-get dpkg 2>/dev/null || true
+
+echo "Waiting for apt locks..."
+while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+      sudo fuser /var/lib/apt/lists/lock    >/dev/null 2>&1 || \
+      sudo fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+  echo "  still locked — retrying in 5s..."
+  sleep 5
+done
+
+sudo dpkg --configure -a 2>/dev/null || true
 sudo apt-get update -y
 
 echo "Installing base tools..."

@@ -10,7 +10,7 @@ This guide walks you through every step to go from zero to a fully deployed Djan
 2. [Run the App Locally](#2-run-the-app-locally)
 3. [Build and Push the Docker Image](#3-build-and-push-the-docker-image)
 4. [Set Up AWS](#4-set-up-aws)
-5. [Provision EC2 with Terraform + GitHub Actions](#5-provision-ec2-with-terraform--github-actions)
+5. [Provision EC2 Manually](#5-provision-ec2-manually)
 6. [Install Jenkins on EC2](#6-install-jenkins-on-ec2)
 7. [Configure Jenkins Pipeline](#7-configure-jenkins-pipeline)
 8. [Create the EKS Cluster](#8-create-the-eks-cluster)
@@ -33,7 +33,6 @@ Install these tools on your local machine before starting.
 | Python 3.11+ | https://python.org |
 | Docker Desktop | https://docker.com |
 | AWS CLI | `brew install awscli` |
-| Terraform 1.6+ | `brew install terraform` |
 | kubectl | `brew install kubectl` |
 | eksctl | `brew install eksctl` |
 | ArgoCD CLI | `brew install argocd` |
@@ -159,105 +158,86 @@ aws ec2 create-key-pair \
 chmod 400 ~/.ssh/django-app-key.pem
 ```
 
-### 4.3 Create the S3 Bucket for Terraform State
-
-```bash
-aws s3api create-bucket \
-  --bucket django-app-tfstate \
-  --region us-east-1
-```
-
-Enable versioning on it (recommended):
-
-```bash
-aws s3api put-bucket-versioning \
-  --bucket django-app-tfstate \
-  --versioning-configuration Status=Enabled
-```
-
-### 4.4 Find Your AMI ID
-
-The default AMI in `variables.tf` is for `us-east-1`. If you use a different region, find the right Ubuntu 22.04 AMI:
-
-```bash
-aws ec2 describe-images \
-  --owners 099720109477 \
-  --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
-  --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
-  --output text
-```
-
-Update `deployments/terraform/variables.tf` with the result.
-
 ---
 
-## 5. Provision EC2 with Terraform + GitHub Actions
+## 5. Provision EC2 Manually
 
-The GitHub Actions workflow at `.github/workflows/terraform-ec2.yml` runs automatically when you push changes to the `deployments/terraform/` folder.
+Create the EC2 instance from the AWS Console.
 
-### 5.1 Add secrets to your GitHub repository
+### 5.1 Launch the instance
 
-Go to your repo → **Settings → Secrets and Variables → Actions → New repository secret**
+1. Go to **AWS Console → EC2 → Instances → Launch instances**
+2. **Name:** `django-app-ec2`
+3. **AMI:** Ubuntu Server 22.04 LTS (64-bit x86)
+4. **Instance type:** `t2.micro` (free tier) or larger
+5. **Key pair:** select `django-app-key` (created in step 4.2)
 
-| Name | Value |
-|---|---|
-| `AWS_ACCESS_KEY_ID` | Your AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | Your AWS secret key |
+### 5.2 Configure the security group
 
-### 5.2 Push to trigger the workflow
+Create a new security group named `django-app-sg` with these inbound rules:
 
-```bash
-git add deployments/terraform/
-git commit -m "provision EC2 with terraform"
-git push origin main
-```
+| Port | Protocol | Source | Purpose |
+|---|---|---|---|
+| 22 | TCP | 0.0.0.0/0 | SSH |
+| 80 | TCP | 0.0.0.0/0 | HTTP |
+| 8080 | TCP | 0.0.0.0/0 | Jenkins |
+| 8585 | TCP | 0.0.0.0/0 | Django app |
 
-GitHub Actions will run:
-1. `terraform init`
-2. `terraform fmt -check`
-3. `terraform validate`
-4. `terraform plan`
-5. `terraform apply` (only on push to `main`)
+### 5.3 Attach an IAM instance profile (optional but recommended)
 
-After it finishes, the EC2 public IP will appear in the workflow logs under the `Terraform Apply` step output.
+This allows SSM Session Manager access so you can connect without SSH:
 
-### 5.3 Run Terraform manually (alternative)
+1. Go to **IAM → Roles → Create role**
+2. Trusted entity: **EC2**
+3. Attach policy: `AmazonSSMManagedInstanceCore`
+4. Name the role `django-app-ec2-ssm-role`
+5. In the EC2 launch wizard under **Advanced details → IAM instance profile**, select this role
 
-If you prefer to run Terraform locally instead of via GitHub Actions:
+### 5.4 Configure storage
 
-```bash
-cd deployments/terraform
+Set root volume to **30 GB, gp3**.
 
-terraform init
-terraform plan
-terraform apply -auto-approve
-```
+### 5.5 Launch and note the public IP
+
+Click **Launch instance**. Once it reaches the **Running** state, copy the **Public IPv4 address** — you'll need it in the next steps.
 
 ---
 
 ## 6. Install Jenkins on EC2
 
-The `installer.sh` script runs automatically when Terraform provisions the EC2 instance — it installs Java, Jenkins, Docker, AWS CLI, kubectl, eksctl, and ArgoCD CLI.
+The `deployments/scripts/installer.sh` script installs Java, Jenkins, Docker, Trivy, AWS CLI, kubectl, eksctl, and ArgoCD CLI in one shot.
 
-### 6.1 SSH into your EC2 instance
+### 6.1 Copy the installer to your EC2 instance
+
+```bash
+scp -i ~/.ssh/django-app-key.pem \
+  deployments/scripts/installer.sh \
+  ubuntu@<EC2_PUBLIC_IP>:/tmp/installer.sh
+```
+
+### 6.2 SSH in and run the installer
 
 ```bash
 ssh -i ~/.ssh/django-app-key.pem ubuntu@<EC2_PUBLIC_IP>
+
+sudo bash /tmp/installer.sh
 ```
 
-### 6.2 Verify Jenkins is running
+The script takes a few minutes. When it finishes you will see `=== All tools installed successfully ===`.
+
+### 6.3 Verify Jenkins is running
 
 ```bash
 sudo systemctl status jenkins
 ```
 
-### 6.3 Get the initial Jenkins password
+### 6.4 Get the initial Jenkins password
 
 ```bash
 sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 ```
 
-### 6.4 Open Jenkins in your browser
+### 6.5 Open Jenkins in your browser
 
 Go to `http://<EC2_PUBLIC_IP>:8080` and paste the password.
 
@@ -266,7 +246,7 @@ Follow the setup wizard:
 - Create your admin user
 - Set the Jenkins URL (use the EC2 IP)
 
-### 6.5 Install extra plugins
+### 6.6 Install extra plugins
 
 Go to **Manage Jenkins → Plugins → Available plugins** and install:
 
@@ -547,14 +527,7 @@ The `SonarQube Analysis` stage in the Jenkinsfile will now run automatically.
 
 Trivy scans your Docker image for known CVEs before it is pushed to Docker Hub.
 
-### Install Trivy on EC2
-
-```bash
-wget https://github.com/aquasecurity/trivy/releases/download/v0.48.0/trivy_0.48.0_Linux-64bit.deb
-sudo dpkg -i trivy_0.48.0_Linux-64bit.deb
-```
-
-Verify:
+Trivy is already installed by `installer.sh`. Verify it is available:
 
 ```bash
 trivy --version
@@ -588,22 +561,11 @@ kubectl delete -f deployments/k8s/service.yaml
 kubectl delete namespace argocd
 ```
 
-### Destroy the EC2 instance with Terraform
+### Terminate the EC2 instance
 
-```bash
-cd deployments/terraform
-terraform destroy -auto-approve
-```
-
-### Delete the S3 bucket
-
-```bash
-# First empty the bucket
-aws s3 rm s3://django-app-tfstate --recursive
-
-# Then delete it
-aws s3api delete-bucket --bucket django-app-tfstate --region us-east-1
-```
+1. Go to **AWS Console → EC2 → Instances**
+2. Select `django-app-ec2`
+3. Click **Instance state → Terminate instance**
 
 ---
 
@@ -626,10 +588,6 @@ Make sure the `postgres` container is running:
 docker ps
 docker logs django-postgres
 ```
-
-### Terraform apply fails — bucket does not exist
-
-Create the S3 bucket manually first (see step 4.3), then re-run `terraform apply`.
 
 ### kubectl — cannot connect to cluster
 

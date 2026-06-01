@@ -1,6 +1,6 @@
 # Django App — End-to-End CI/CD on AWS
 
-A production-ready Django REST API deployed with a full CI/CD pipeline using Docker, Jenkins, Terraform, Kubernetes (EKS), ArgoCD, and GitHub Actions.
+A production-ready Django REST API deployed with a full CI/CD pipeline using Docker, Jenkins, Kubernetes (EKS), and ArgoCD.
 
 ---
 
@@ -12,8 +12,8 @@ A production-ready Django REST API deployed with a full CI/CD pipeline using Doc
 | Database | PostgreSQL 15 |
 | Cache / Queue | Redis + Celery |
 | Containerization | Docker + Docker Compose |
-| CI/CD | Jenkins + GitHub Actions |
-| Infrastructure | Terraform (AWS EC2) |
+| CI/CD | Jenkins |
+| Infrastructure | AWS EC2 (manual provisioning) |
 | Orchestration | Kubernetes on AWS EKS |
 | Continuous Delivery | ArgoCD |
 | Security Scanning | Trivy + SonarQube |
@@ -44,9 +44,9 @@ django-app-deployment/
 │
 └── deployments/
     ├── k8s/                  ← Kubernetes manifests
-    ├── terraform/            ← AWS EC2 provisioning
     ├── jenkins/              ← Jenkinsfile pipeline
-    └── .github/workflows/    ← GitHub Actions workflows
+    └── scripts/              ← Server setup scripts
+        └── installer.sh      ← Installs Jenkins, Docker, Trivy, etc.
 ```
 
 ---
@@ -78,17 +78,6 @@ make up
 | `GET /` | Homepage — returns app status |
 | `GET /api/health/` | Health check — returns `{"status": "ok"}` |
 | `GET /admin/` | Django admin panel |
-
----
-
-## GitHub Required Secrets
-
-Add these in **Settings → Secrets and Variables → Actions**:
-
-| Secret | Value |
-|---|---|
-| `AWS_ACCESS_KEY_ID` | Your AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | Your AWS secret key |
 
 ---
 
